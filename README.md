@@ -24,7 +24,7 @@ We'll be using [docker](https://www.docker.com/) because it's dead simple.
 1. Launch Unity and open your project.
 2. Download or pull down this repo.
 3. Drag and drop the folder `MySQL`(under plugins) to `Assets-> uMMORPG -> Plugins`
-4. **You'll get some erros, don't panic.** These show up because Unity doesn't know how handle .net assembly dependency versions that are higher than the listed requirements.
+4. **You'll get some errors, don't panic.** These show up because Unity doesn't know how handle .net assembly dependency versions that are higher than the listed requirements.
 5. Select the .net assenbly `MySqlConnector` under `Assets/uMMORPG/Plugins/MySQL/MySqlConnector/` and uncheck the `Validate References` property under `General` in the inspector. Click `Apply` in the inspector.
 6. Right click `MySqlConnector` in the project window and select `Re-import`
 7. Do the same to `System.Memory` and `System.Threading.Tasks.Extensions`.  Don't forget to re-import after each time.
