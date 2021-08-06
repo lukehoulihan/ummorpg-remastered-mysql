@@ -10,11 +10,11 @@ using UnityEngine.Events;
 
 public enum MySqlSSLMode : byte { None, Preferred, Required, VerifyCA, VerifyFull };
 
-public partial class DatabaseMySql : MonoBehaviour
+public partial class Database : MonoBehaviour
 {
 
     // singleton for easier access
-    public static DatabaseMySql singleton;
+    public static Database singleton;
 
     public OrmConnectionFactory connFactory;
     // connection (public so it can be used by addons)
@@ -197,7 +197,7 @@ public partial class DatabaseMySql : MonoBehaviour
 
         // then load valid items and put into their slots
         // (one big query is A LOT faster than querying each slot separately)
-        foreach (CharacterInventory row in connection.Select<CharacterInventory>(q => q.name == inventory.name))
+        foreach (CharacterInventory row in connection.Select<CharacterInventory>(q => q.character == inventory.name))
         {
             if (row.slot < inventory.size)
             {
@@ -224,7 +224,7 @@ public partial class DatabaseMySql : MonoBehaviour
 
         // then load valid equipment and put into their slots
         // (one big query is A LOT faster than querying each slot separately)
-        foreach (CharacterEquipment row in connection.Select<CharacterEquipment>(q => q.name == equipment.name))
+        foreach (CharacterEquipment row in connection.Select<CharacterEquipment>(q => q.character == equipment.name))
         {
             if (row.slot < equipment.slotInfo.Length)
             {
@@ -319,7 +319,7 @@ public partial class DatabaseMySql : MonoBehaviour
     void LoadQuests(PlayerQuests quests)
     {
         // load quests
-        foreach (CharacterQuest row in connection.Select<CharacterQuest>(q => q.name == quests.name))
+        foreach (CharacterQuest row in connection.Select<CharacterQuest>(q => q.character == quests.name))
         {
             ScriptableQuest questData;
             if (ScriptableQuest.All.TryGetValue(row.name.GetStableHashCode(), out questData))
@@ -340,7 +340,8 @@ public partial class DatabaseMySql : MonoBehaviour
     //    because we don't ever have to load guilds that aren't needed
     void LoadGuildOnDemand(PlayerGuild playerGuild)
     {
-        string guildName = connection.GetScalar<CharacterGuild, string>(x => x.character, y => y.character == playerGuild.name);
+        string guildName = connection.GetScalar<CharacterGuild, string>(x => x.guild, y => y.character == playerGuild.name);
+        Debug.Log("Guild Name: " + guildName);
         if (guildName != null)
         {
             // load guild on demand when the first player of that guild logs in
@@ -631,7 +632,7 @@ public partial class DatabaseMySql : MonoBehaviour
     // guilds //////////////////////////////////////////////////////////////////
     public bool GuildExists(string guild)
     {
-        return connection.Select<GuildInfo>(q => q.name == guild) != null;
+        return connection.FirstOrDefault<GuildInfo>(q => q.name == guild) != null;
     }
 
     Guild LoadGuild(string guildName)
@@ -642,21 +643,25 @@ public partial class DatabaseMySql : MonoBehaviour
         guild.name = guildName;
 
         // load guild info
-        GuildInfo info = connection.Select<GuildInfo>(q => q.name == guildName).FirstOrDefault();
+        GuildInfo info = connection.FirstOrDefault<GuildInfo>(q => q.name == guildName);
         if (info != null)
         {
             guild.notice = info.notice;
         }
 
+        Debug.Log("List: " + connection.Select<CharacterGuild>(q => q.guild == guildName));
+
         // load members list
-        List<CharacterGuild> rows = connection.Select<CharacterGuild>(q => q.guild == guildName).ToList<CharacterGuild>();
-        GuildMember[] members = new GuildMember[rows.Count]; // avoid .ToList(). use array directly.
-        for (int i = 0; i < rows.Count; ++i)
+        var rows = connection.Select<CharacterGuild>(q => q.guild == guildName).ToArray();
+        GuildMember[] members = new GuildMember[rows.Count()]; // avoid .ToList(). use array directly.
+        Debug.Log("CharacterGuild Rows: " + rows.Count());
+        for (int i = 0; i < rows.Count(); ++i)
         {
             CharacterGuild row = rows[i];
 
             GuildMember member = new GuildMember();
             member.name = row.character;
+            Debug.Log("Row Character: " + row.character);
             member.rank = (GuildRank)row.rank;
 
             // is this player online right now? then use runtime data
@@ -669,7 +674,7 @@ public partial class DatabaseMySql : MonoBehaviour
             {
                 member.online = false;
                 // note: FindWithQuery<characters> is easier than ExecuteScalar<int> because we need the null check
-                Character character = connection.GetScalar<Character, Character>(s => s.name == member.name ? s : null);
+                Character character = connection.FirstOrDefault<Character>(q => q.name == member.name);
                 member.level = character != null ? character.level : 1;
             }
 
@@ -684,10 +689,22 @@ public partial class DatabaseMySql : MonoBehaviour
         if (useTransaction) connection.BeginTransaction(); // transaction for performance
 
         // guild info
-        connection.Insert(new GuildInfo{
-            name = guild.name,
-            notice = guild.notice
-        });
+        if (connection.FirstOrDefault<GuildInfo>(q => q.name == guild.name) != null)
+        {
+            connection.Update<GuildInfo>(new GuildInfo
+            {
+                name = guild.name,
+                notice = guild.notice
+            });
+        } 
+        else
+        {
+            connection.Insert<GuildInfo>(new GuildInfo
+            {
+                name = guild.name,
+                notice = guild.notice
+            });
+        }
 
         // members list
         connection.DeleteAll<CharacterGuild>(d => d.guild == guild.name);
