@@ -341,7 +341,6 @@ public partial class Database : MonoBehaviour
     void LoadGuildOnDemand(PlayerGuild playerGuild)
     {
         string guildName = connection.GetScalar<CharacterGuild, string>(x => x.guild, y => y.character == playerGuild.name);
-        Debug.Log("Guild Name: " + guildName);
         if (guildName != null)
         {
             // load guild on demand when the first player of that guild logs in
